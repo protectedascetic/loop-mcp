@@ -13,8 +13,13 @@ import os
 from datetime import datetime, timedelta
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.routing import Mount, Route
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -286,11 +291,34 @@ async def resolve_loop(loop_id: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Run
+# ASGI app — plain Starlette, no TrustedHostMiddleware (Railway-compatible)
 # ---------------------------------------------------------------------------
 
-# Expose the Starlette SSE app for uvicorn (used by Procfile)
-app = mcp.sse_app()
+_sse = SseServerTransport("/messages/")
+
+
+async def _handle_sse(request: Request) -> None:
+    async with _sse.connect_sse(
+        request.scope, request.receive, request._send
+    ) as (recv_stream, send_stream):
+        await mcp._mcp_server.run(
+            recv_stream,
+            send_stream,
+            mcp._mcp_server.create_initialization_options(),
+        )
+
+
+async def _health(request: Request) -> Response:
+    return Response("ok", media_type="text/plain")
+
+
+app = Starlette(
+    routes=[
+        Route("/health", endpoint=_health),
+        Route("/sse", endpoint=_handle_sse),
+        Mount("/messages/", app=_sse.handle_post_message),
+    ]
+)
 
 if __name__ == "__main__":
     import uvicorn
