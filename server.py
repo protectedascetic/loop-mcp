@@ -53,7 +53,7 @@ async def _get_user_id(db: AsyncSession) -> int | None:
 # MCP Server
 # ---------------------------------------------------------------------------
 
-mcp = FastMCP("loop", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
+mcp = FastMCP("loop")
 
 
 @mcp.tool()
@@ -289,5 +289,10 @@ async def resolve_loop(loop_id: int) -> str:
 # Run
 # ---------------------------------------------------------------------------
 
+# Expose the Starlette SSE app for uvicorn (used by Procfile)
+app = mcp.sse_app()
+
 if __name__ == "__main__":
-    mcp.run(transport="sse")
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
