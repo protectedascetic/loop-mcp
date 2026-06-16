@@ -53,7 +53,7 @@ async def _get_user_id(db: AsyncSession) -> int | None:
 # MCP Server
 # ---------------------------------------------------------------------------
 
-mcp = FastMCP("loop")
+mcp = FastMCP("loop", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
 
 
 @mcp.tool()
@@ -290,5 +290,4 @@ async def resolve_loop(loop_id: int) -> str:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    mcp.run(transport="sse", host="0.0.0.0", port=port)
+    mcp.run(transport="sse")
